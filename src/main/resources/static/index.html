@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Strompreise (AJAX & Graph)</title>
+    <!-- Chart.js und den Zeitadapter einbinden -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+</head>
+<body>
+<h1>Strompreise</h1>
+
+<!-- Formular zur Eingabe von Start- und Endzeit -->
+<form id="priceForm">
+    <label for="start">Startzeit:</label>
+    <input type="datetime-local" id="start" name="start" required>
+
+    <label for="end">Endzeit:</label>
+    <input type="datetime-local" id="end" name="end" required>
+
+    <button type="submit">Daten abrufen</button>
+</form>
+
+<h2>Ermittelte Preise</h2>
+<table border="1">
+    <thead>
+    <tr>
+        <th>Zeitpunkt</th>
+        <th>Preis (€/MWh)</th>
+    </tr>
+    </thead>
+    <tbody id="priceTableBody"></tbody>
+</table>
+
+<h2>Graphische Darstellung</h2>
+<canvas id="priceChart" width="800" height="400"></canvas>
+
+<script>
+    let priceChartInstance = null;
+
+    document.getElementById("priceForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // verhindert Seitenreload
+
+        // Werte aus dem Formular auslesen
+        const start = document.getElementById("start").value;
+        const end = document.getElementById("end").value;
+
+        // REST-Endpunkt mit Query-Parametern aufrufen
+        const url = `/api/prices?start=${start}&end=${end}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById("priceTableBody");
+                tableBody.innerHTML = "";
+                let chartData = [];
+
+                data.forEach(price => {
+                    // Wir nehmen an, dass die API-Felder "start_timestamp" und "marketprice" liefert.
+                    // marketprice ist in €/MWh.
+                    const dateObj = new Date(price.start_timestamp);
+                    const dateString = isNaN(dateObj)
+                        ? price.start_timestamp
+                        : dateObj.toLocaleString();
+                    const priceString = price.marketprice
+                        ? price.marketprice.toFixed(2)
+                        : "n/a";
+
+                    // Tabelle befüllen
+                    tableBody.insertAdjacentHTML("beforeend", `
+              <tr>
+                <td>${dateString}</td>
+                <td>${priceString}</td>
+              </tr>
+            `);
+
+                    // Nur gültige Datumswerte in den Chart übernehmen
+                    if(!isNaN(dateObj)) {
+                        chartData.push({ x: dateObj, y: price.marketprice });
+                    }
+                });
+
+                updateChart(chartData);
+            })
+            .catch(err => console.error("Fehler beim Laden der Daten:", err));
+    });
+
+    function updateChart(data) {
+        const ctx = document.getElementById("priceChart").getContext("2d");
+        if (priceChartInstance) {
+            // Falls der Chart bereits existiert, Daten aktualisieren
+            priceChartInstance.data.datasets[0].data = data;
+            priceChartInstance.update();
+        } else {
+            // Neuen Chart erstellen
+            priceChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Strompreis (€/MWh)',
+                        data: data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            type: 'time', // Zeitachse verwenden
+                            time: {
+                                unit: 'hour'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Zeit'
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Preis (€/MWh)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+</script>
+</body>
+</html>
