@@ -13,8 +13,11 @@ import java.util.stream.Collectors;
 @Service
 public class AwattarAjaxService {
 
+    long endTimestamp = System.currentTimeMillis() + (2 * 24 * 60 * 60 * 1000);
+
+
     private final RestTemplate restTemplate = new RestTemplate();
-    private final String AWATTAR_API_URL = "https://api.awattar.at/v1/marketdata";
+    private final String AWATTAR_API_URL = "https://api.awattar.at/v1/marketdata?start=1561932000000&end="+endTimestamp;
 
     public List<PriceData> fetchPrices(LocalDateTime start, LocalDateTime end) {
         System.out.println("Rufe API für Zeitraum: " + start + " bis " + end + " auf.");
